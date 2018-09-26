@@ -11,32 +11,25 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
-
+using System.Windows.Forms;
 
 namespace JerryUploader
 {
     /// <summary>
-    /// Interaction logic for Window1.xaml
+    /// Interaction logic for Selector.xaml 
     /// </summary>
-    public partial class LoginWindow : Window
+    public partial class Selector : Window
     {
-        public LoginWindow()
+        public Selector()
         {
             InitializeComponent();
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            MainWindow mainWindow = new MainWindow();
-            mainWindow.Show();
-            this.Close();
-        }
-
-        private void Button_Click_1(object sender, RoutedEventArgs e)
-        {
-            Selector selector = new Selector();
-            selector.Show();
-            Close();
+            FolderBrowserDialog _dialog = new FolderBrowserDialog();
+            _dialog.ShowDialog();
+            
         }
     }
 }

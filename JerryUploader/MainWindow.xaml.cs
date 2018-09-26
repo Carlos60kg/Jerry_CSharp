@@ -24,5 +24,37 @@ namespace JerryUploader
         {
             InitializeComponent();
         }
+
+        private void ComboBoxItem_Selected(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void ComboBoxItem_Selected_1(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void ListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+
+        }
+
+        private void Button_Click(object sender, RoutedEventArgs e)
+        {
+            
+        }
+
+        private void Button_Click_1(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("little test");
+        }
+
+        private void Button_Click_2(object sender, RoutedEventArgs e)
+        {
+            LoginWindow tempWindow = new LoginWindow();
+            tempWindow.Show();
+            this.Close();
+        }
     }
 }

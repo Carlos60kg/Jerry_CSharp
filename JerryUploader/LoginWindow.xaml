@@ -1,0 +1,17 @@
+﻿<Window x:Class="JerryUploader.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:JerryUploader"
+        mc:Ignorable="d"
+        Title="Welcome to Uploader" Height="450" Width="410">
+    <Grid>
+        <TextBlock HorizontalAlignment="Left" Height="27" Margin="10,76,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="131" FontSize="16"><Run Text="E"/><Run Text="mail"/><Run Text=":"/></TextBlock>
+        <TextBox HorizontalAlignment="Left" Height="27" Margin="168,76,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="223"/>
+        <TextBlock HorizontalAlignment="Left" Height="27" Margin="10,133,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="131" FontSize="16"><Run Text="P"/><Run Text="assword:"/></TextBlock>
+        <TextBox HorizontalAlignment="Left" Height="27" Margin="168,133,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="223"/>
+        <Button Content="LOG IN" HorizontalAlignment="Left" Height="27" Margin="238,235,0,0" VerticalAlignment="Top" Width="153" FontSize="14" Click="Button_Click_1" Background="#FFCF7F0B"/>
+        <Button Content="CREATE AN ACCOUNT" HorizontalAlignment="Left" Height="27" Margin="10,235,0,0" VerticalAlignment="Top" Width="153" FontSize="14" Click="Button_Click"/>
+    </Grid>
+</Window>

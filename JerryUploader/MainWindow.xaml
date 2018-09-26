@@ -5,8 +5,27 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:JerryUploader"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="Welcome to Uploader" Height="450" Width="410">
     <Grid>
-        
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition Width="0*"/>
+        </Grid.ColumnDefinitions>
+        <Button Content="CREATE AN ACCOUNT" HorizontalAlignment="Left" Height="27" Margin="238,280,0,0" VerticalAlignment="Top" Width="153" FontSize="14" Click="Button_Click_1" Background="#FFCF7F0B"/>
+        <!--<ComboBox HorizontalAlignment="Left" Height="27" Margin="306,74,0,0" VerticalAlignment="Top" Width="223">
+            <ComboBoxItem Content="Franklin" HorizontalAlignment="Left" Width="223"/>
+            <ComboBoxItem Content="Jay" HorizontalAlignment="Left" Width="223" Selected="ComboBoxItem_Selected"/>
+            <ComboBoxItem Content="Seth" HorizontalAlignment="Left" Width="223" Selected="ComboBoxItem_Selected_1"/>
+            <ComboBoxItem Content="Jerry" HorizontalAlignment="Left" Width="223"/>
+            <Border HorizontalAlignment="Center" Width="223"/>
+            <Border HorizontalAlignment="Left" Width="223"/>
+        </ComboBox>-->
+        <TextBox HorizontalAlignment="Left" Height="27" Margin="168,133,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="223"/>
+        <Button Content="LOG IN" HorizontalAlignment="Left" Height="27" Margin="10,280,0,0" VerticalAlignment="Top" Width="153" FontSize="14" Click="Button_Click_2" Background="#FFDDDDDD"/>
+        <TextBlock HorizontalAlignment="Left" Height="27" Margin="10,133,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="131" FontSize="16"><Run Text="P"/><Run Text="assword:"/></TextBlock>
+        <TextBlock HorizontalAlignment="Left" Height="27" Margin="10,76,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="131" FontSize="16"><Run Text="E"/><Run Text="mail"/><Run Text=":"/></TextBlock>
+        <TextBox HorizontalAlignment="Left" Height="27" Margin="168,76,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="223"/>
+        <TextBlock HorizontalAlignment="Left" Height="27" Margin="10,191,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="131" FontSize="16"><Run Text="Confirm Password"/><Run Text=":"/></TextBlock>
+        <TextBox HorizontalAlignment="Left" Height="27" Margin="168,191,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="223"/>
     </Grid>
 </Window>

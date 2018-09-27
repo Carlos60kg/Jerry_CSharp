@@ -29,13 +29,13 @@ namespace JerryUploader
         {
             MainWindow mainWindow = new MainWindow();
             mainWindow.Show();
-            this.Close();
+            Close();
         }
 
         private void Button_Click_1(object sender, RoutedEventArgs e)
         {
-            Selector selector = new Selector();
-            selector.Show();
+            FileShowWindow fileShow = new FileShowWindow();
+            fileShow.Show();
             Close();
         }
     }

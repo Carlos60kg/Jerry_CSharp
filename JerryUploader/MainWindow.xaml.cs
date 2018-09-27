@@ -54,7 +54,7 @@ namespace JerryUploader
         {
             LoginWindow tempWindow = new LoginWindow();
             tempWindow.Show();
-            this.Close();
+            Close();
         }
     }
 }

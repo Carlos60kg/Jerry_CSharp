@@ -14,6 +14,7 @@ using System.Windows.Shapes;
 using System.Windows.Forms;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using PlayFab;
 using PlayFab.AdminModels;
 using PlayFab.Json;
@@ -40,6 +41,7 @@ namespace JerryUploader
         public FileShowWindow()
         {
             InitializeComponent();
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
         private void TextBoxAssetFolder_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -258,7 +260,18 @@ namespace JerryUploader
             { CdnPlatform.Android, "Android/" },
         };
         public static string cdnPath = "./PlayFabData/AssetBundles/";
-        private void Button_Click_Upload(object sender, RoutedEventArgs e)
+
+        /// <summary>
+        /// i dont know if it is feasible to add the async modifier to this method ...
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        /// <returns></returns>
+        private async void Button_Click_Upload(object sender, RoutedEventArgs e)
+        {
+            await UploadFilesAsync();
+        }
+        private async Task UploadFilesAsync()
         {
             try
             {
@@ -271,40 +284,38 @@ namespace JerryUploader
                     throw new Exception("\tFailed to load Title Settings");
 
                 // start uploading
-                if (!UploadTitleData())
+                if (!await UploadTitleData())
                     throw new Exception("\tFailed to upload TitleData.");
-                if (!UploadEconomyData())
+                if (!await UploadEconomyData())
                     throw new Exception("\tFailed to upload Economy Data.");
-                if (!UploadCloudScript())
+                if (!await UploadCloudScript())
                     throw new Exception("\tFailed to upload CloudScript.");
-                if (!UploadTitleNews())
+                if (!await UploadTitleNews())
                     throw new Exception("\tFailed to upload TitleNews.");
-                if (!UploadStatisticDefinitions())
+                if (!await UploadStatisticDefinitions())
                     throw new Exception("\tFailed to upload Statistics Definitions.");
-                if (!UploadCdnAssets())
+                if (!await UploadCdnAssets())
                     throw new Exception("\tFailed to upload CDN Assets.");
             }
             catch (Exception ex)
             {
                 hitErrors = true;
-                LogToFile("\tAn unexpected error occurred: " + ex.Message, ConsoleColor.Red);
+                LogToFile("\tAn unexpected error occurred: " + ex.Message);
             }
             finally
             {
                 var status = hitErrors ? "ended with errors. See PreviousUploadLog.txt for details" : "ended successfully!";
-                var color = hitErrors ? ConsoleColor.Red : ConsoleColor.White;
 
-                LogToFile("UB_Uploader.exe " + status, color);
+                LogToFile("UB_Uploader.exe " + status);
                 logStream.Close();
                 Console.WriteLine("Press return to exit.");
                 Console.ReadLine();
             }
         }
 
-        private  bool GetTitleSettings()
+        private bool GetTitleSettings()
         {
             var parsedFile = ParseFile(titleSettingsPath);
-
             var titleSettings = JsonWrapper.DeserializeObject<Dictionary<string, string>>(parsedFile);
 
             if (titleSettings != null &&
@@ -318,37 +329,37 @@ namespace JerryUploader
                 return true;
             }
 
-            LogToFile("An error occurred when trying to parse TitleSettings.json", ConsoleColor.Red);
+            LogToFile("An error occurred when trying to parse TitleSettings.json");
             return false;
         }
 
         #region Uploading Functions -- these are straightforward calls that push the data to the backend
-        private  bool UploadEconomyData()
+        private async Task<bool> UploadEconomyData()
         {
             ////MUST upload these in this order so that the economy data is properly imported: VC -> Catalogs -> DropTables -> Stores
-            if (!UploadVc())
+            if (UploadVc().Result == false)
                 return false;
 
             var reUploadList = new List<CatalogItem>();
             if (!UploadCatalog(ref reUploadList))
                 return false;
 
-            if (!UploadDropTables())
+            if (UploadDropTables().Result == false)
                 return false;
 
-            if (!UploadStores())
+            if (UploadStores().Result == false)
                 return false;
 
             // workaround for the DropTable conflict
             if (reUploadList.Count > 0)
             {
                 LogToFile("Re-uploading [" + reUploadList.Count + "] CatalogItems due to DropTable conflicts...");
-                UpdateCatalog(reUploadList);
+                await UpdateCatalog(reUploadList);
             }
             return true;
         }
 
-        private  bool UploadStatisticDefinitions()
+        private async Task<bool> UploadStatisticDefinitions()
         {
             if (string.IsNullOrEmpty(statsDefPath))
                 return false;
@@ -376,7 +387,7 @@ namespace JerryUploader
                 {
                     if (createStatTask.Result.Error.Error == PlayFabErrorCode.StatisticNameConflict)
                     {
-                        LogToFile("\tStatistic Already Exists, Updating values: " + item.StatisticName, ConsoleColor.DarkYellow);
+                        LogToFile("\tStatistic Already Exists, Updating values: " + item.StatisticName);
                         var updateRequest = new UpdatePlayerStatisticDefinitionRequest()
                         {
                             StatisticName = item.StatisticName,
@@ -389,7 +400,7 @@ namespace JerryUploader
                         if (updateStatTask.Result.Error != null)
                             OutputPlayFabError("\t\tStatistics Definition Error: " + item.StatisticName, updateStatTask.Result.Error);
                         else
-                            LogToFile("\t\tStatistics Definition:" + item.StatisticName + " Updated", ConsoleColor.Green);
+                            LogToFile("\t\tStatistics Definition:" + item.StatisticName + " Updated");
                     }
                     else
                     {
@@ -398,13 +409,13 @@ namespace JerryUploader
                 }
                 else
                 {
-                    LogToFile("\t\tStatistics Definition: " + item.StatisticName + " Created", ConsoleColor.Green);
+                    LogToFile("\t\tStatistics Definition: " + item.StatisticName + " Created");
                 }
             }
             return true;
         }
 
-        private  bool UploadTitleNews()
+        private async Task<bool> UploadTitleNews()
         {
             if (string.IsNullOrEmpty(titleNewsPath))
                 return false;
@@ -430,13 +441,13 @@ namespace JerryUploader
                 if (addNewsTask.Result.Error != null)
                     OutputPlayFabError("\t\tTitleNews Upload: " + item.Title, addNewsTask.Result.Error);
                 else
-                    LogToFile("\t\t" + item.Title + " Uploaded.", ConsoleColor.Green);
+                    LogToFile("\t\t" + item.Title + " Uploaded.");
             }
 
             return true;
         }
 
-        private  bool UploadCloudScript()
+        private async Task<bool> UploadCloudScript()
         {
             if (string.IsNullOrEmpty(cloudScriptPath))
                 return false;
@@ -446,7 +457,7 @@ namespace JerryUploader
 
             if (parsedFile == null)
             {
-                LogToFile("\tAn error occurred deserializing the CloudScript.js file.", ConsoleColor.Red);
+                LogToFile("\tAn error occurred deserializing the CloudScript.js file.");
                 return false;
             }
             var files = new List<CloudScriptFile> {
@@ -472,11 +483,11 @@ namespace JerryUploader
                 return false;
             }
 
-            LogToFile("\tUploaded CloudScript!", ConsoleColor.Green);
+            LogToFile("\tUploaded CloudScript!");
             return true;
         }
 
-        private  bool UploadTitleData()
+        private async Task<bool> UploadTitleData()
         {
             if (string.IsNullOrEmpty(titleDataPath))
                 return false;
@@ -501,13 +512,13 @@ namespace JerryUploader
                 if (setTitleDataTask.Result.Error != null)
                     OutputPlayFabError("\t\tTitleData Upload: " + kvp.Key, setTitleDataTask.Result.Error);
                 else
-                    LogToFile("\t\t" + kvp.Key + " Uploaded.", ConsoleColor.Green);
+                    LogToFile("\t\t" + kvp.Key + " Uploaded.");
             }
 
             return true;
         }
 
-        private  bool UploadVc()
+        private async Task<bool> UploadVc()
         {
             LogToFile("Uploading Virtual Currency Settings...");
             var parsedFile = ParseFile(currencyPath);
@@ -526,11 +537,11 @@ namespace JerryUploader
                 return false;
             }
 
-            LogToFile("\tUploaded VC!", ConsoleColor.Green);
+            LogToFile("\tUploaded VC!");
             return true;
         }
 
-        private  bool UploadCatalog(ref List<CatalogItem> reUploadList)
+        private bool UploadCatalog(ref List<CatalogItem> reUploadList)
         {
             if (string.IsNullOrEmpty(catalogPath))
                 return false;
@@ -541,7 +552,7 @@ namespace JerryUploader
             var catalogWrapper = JsonWrapper.DeserializeObject<CatalogWrapper>(parsedFile);
             if (catalogWrapper == null)
             {
-                LogToFile("\tAn error occurred deserializing the Catalog.json file.", ConsoleColor.Red);
+                LogToFile("\tAn error occurred deserializing the Catalog.json file.");
                 return false;
             }
             for (var z = 0; z < catalogWrapper.Catalog.Count; z++)
@@ -557,10 +568,10 @@ namespace JerryUploader
                 }
             }
 
-            return UpdateCatalog(catalogWrapper.Catalog);
+            return UpdateCatalog(catalogWrapper.Catalog).Result;
         }
 
-        private  bool UploadDropTables()
+        private async Task<bool> UploadDropTables()
         {
             if (string.IsNullOrEmpty(dropTablesPath))
                 return false;
@@ -571,7 +582,7 @@ namespace JerryUploader
             var dtDict = JsonWrapper.DeserializeObject<Dictionary<string, RandomResultTableListing>>(parsedFile);
             if (dtDict == null)
             {
-                LogToFile("\tAn error occurred deserializing the DropTables.json file.", ConsoleColor.Red);
+                LogToFile("\tAn error occurred deserializing the DropTables.json file.");
                 return false;
             }
 
@@ -600,11 +611,11 @@ namespace JerryUploader
                 return false;
             }
 
-            LogToFile("\tUploaded DropTables!", ConsoleColor.Green);
+            LogToFile("\tUploaded DropTables!");
             return true;
         }
 
-        private  bool UploadStores()
+        private async Task<bool> UploadStores()
         {
             if (string.IsNullOrEmpty(storesPath))
                 return false;
@@ -632,12 +643,12 @@ namespace JerryUploader
                 if (updateStoresTask.Result.Error != null)
                     OutputPlayFabError("\t\tStore Upload: " + eachStore.StoreId, updateStoresTask.Result.Error);
                 else
-                    LogToFile("\t\tStore: " + eachStore.StoreId + " Uploaded. ", ConsoleColor.Green);
+                    LogToFile("\t\tStore: " + eachStore.StoreId + " Uploaded. ");
             }
             return true;
         }
 
-        private  bool UploadCdnAssets()
+        private async Task<bool> UploadCdnAssets()
         {
             if (string.IsNullOrEmpty(cdnAssetsPath))
                 return false;
@@ -660,7 +671,7 @@ namespace JerryUploader
             }
             else
             {
-                LogToFile("\tAn error occurred deserializing CDN Assets: ", ConsoleColor.Red);
+                LogToFile("\tAn error occurred deserializing CDN Assets: ");
                 return false;
             }
             return true;
@@ -668,21 +679,18 @@ namespace JerryUploader
         #endregion
 
         #region Helper Functions -- these functions help the main uploading functions
-         void LogToFile(string content, ConsoleColor color = ConsoleColor.White)
+        void LogToFile(string content)
         {
-            Console.ForegroundColor = color;
             //Console.WriteLine(content);
-            FileShowWindow fileShowWindow = new FileShowWindow();
-            fileShowWindow.textBox_ShowProgress.Text = content;
+            //Dispatcher.BeginInvoke(new Action(() => textBox_ShowProgress.Text = content));
+            textBox_ShowProgress.Text += content;
             logStream.WriteLine(content);
-
-            Console.ForegroundColor = ConsoleColor.White;
         }
 
-         void OutputPlayFabError(string context, PlayFabError err)
+        void OutputPlayFabError(string context, PlayFabError err)
         {
             hitErrors = true;
-            LogToFile("\tAn error occurred during: " + context, ConsoleColor.Red);
+            LogToFile("\tAn error occurred during: " + context);
 
             var details = string.Empty;
             if (err.ErrorDetails != null)
@@ -696,10 +704,10 @@ namespace JerryUploader
                 }
             }
 
-            LogToFile(string.Format("\t\t[{0}] -- {1}: {2} ", err.Error, err.ErrorMessage, details), ConsoleColor.Red);
+            LogToFile(string.Format("\t\t[{0}] -- {1}: {2} ", err.Error, err.ErrorMessage, details));
         }
 
-         string ParseFile(string path)
+        string ParseFile(string path)
         {
             var s = File.OpenText(path);
             var contents = s.ReadToEnd();
@@ -707,7 +715,7 @@ namespace JerryUploader
             return contents;
         }
 
-         CatalogItem CloneCatalogItemAndStripTables(CatalogItem strip)
+        CatalogItem CloneCatalogItemAndStripTables(CatalogItem strip)
         {
             if (strip == null)
                 return null;
@@ -733,7 +741,7 @@ namespace JerryUploader
             };
         }
 
-        private  bool UpdateCatalog(List<CatalogItem> catalog)
+        private async Task<bool> UpdateCatalog(List<CatalogItem> catalog)
         {
             var request = new UpdateCatalogItemsRequest
             {
@@ -742,7 +750,7 @@ namespace JerryUploader
             };
 
             var updateCatalogItemsTask = PlayFabAdminAPI.UpdateCatalogItemsAsync(request);
-            updateCatalogItemsTask.Wait();
+            await updateCatalogItemsTask;
 
             if (updateCatalogItemsTask.Result.Error != null)
             {
@@ -750,11 +758,11 @@ namespace JerryUploader
                 return false;
             }
 
-            LogToFile("\tUploaded Catalog!", ConsoleColor.Green);
+            LogToFile("\tUploaded Catalog!");
             return true;
         }
 
-        private  bool UploadAsset(string key, string path)
+        private async Task<bool> UploadAsset(string key, string path)
         {
             var request = new GetContentUploadUrlRequest()
             {
@@ -764,7 +772,7 @@ namespace JerryUploader
 
             LogToFile("\tFetching CDN endpoint for " + key);
             var getContentUploadTask = PlayFabAdminAPI.GetContentUploadUrlAsync(request);
-            getContentUploadTask.Wait();
+            await getContentUploadTask;
 
             if (getContentUploadTask.Result.Error != null)
             {
@@ -773,14 +781,14 @@ namespace JerryUploader
             }
 
             var destUrl = getContentUploadTask.Result.Result.URL;
-            LogToFile("\t\tAcquired CDN Address: " + key, ConsoleColor.Green);
+            LogToFile("\t\tAcquired CDN Address: " + key);
 
             byte[] fileContents = File.ReadAllBytes(path);
 
             return PutFile(key, destUrl, fileContents);
         }
 
-        private  bool PutFile(string key, string url, byte[] payload)
+        private bool PutFile(string key, string url, byte[] payload)
         {
             LogToFile("\t\tStarting HTTP PUT for: " + key);
 
@@ -796,20 +804,19 @@ namespace JerryUploader
             }
             else
             {
-                LogToFile("\t\t\tERROR: Byte array was empty or null", ConsoleColor.Red);
+                LogToFile("\t\t\tERROR: Byte array was empty or null");
                 return false;
             }
 
             var response = (HttpWebResponse)request.GetResponse();
-
             if (response.StatusCode == HttpStatusCode.OK)
             {
-                LogToFile("\t\t\tHTTP PUT Successful:" + key, ConsoleColor.Green);
+                LogToFile("\t\t\tHTTP PUT Successful:" + key);
                 return true;
             }
             else
             {
-                LogToFile(string.Format("\t\t\tERROR: Asset:{0} -- Code:[{1}] -- Msg:{2}", url, response.StatusCode, response.StatusDescription), ConsoleColor.Red);
+                LogToFile(string.Format("\t\t\tERROR: Asset:{0} -- Code:[{1}] -- Msg:{2}", url, response.StatusCode, response.StatusDescription));
                 return false;
             }
         }

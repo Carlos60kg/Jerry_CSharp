@@ -44,17 +44,17 @@
         <TextBlock HorizontalAlignment="Left" Height="28" Margin="25,576,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="105" FontSize="16" Text="CDN Assets"/>
         <Button Content="Select" HorizontalAlignment="Left" Height="28" Margin="655,574,0,0" VerticalAlignment="Top" Width="80" FontSize="14" Click="Button_Click_21"/>
         <Button Content="Upload" HorizontalAlignment="Left" Height="30" Margin="25,635,0,0" VerticalAlignment="Top" Width="222" FontSize="16" Click="Button_Click_Upload"/>
-        <Button Content="Abort Uploading" HorizontalAlignment="Left" Height="30" Margin="308,635,0,0" VerticalAlignment="Top" Width="222" FontSize="16"/>
+        <Button Content="Abort Uploading" HorizontalAlignment="Left" Height="30" Margin="308,635,0,0" VerticalAlignment="Top" Width="222" FontSize="16" Click="Abort_Button_Click"/>
         <Button Content="Previous" HorizontalAlignment="Left" Height="28" Margin="558,635,0,0" VerticalAlignment="Top" Width="80" FontSize="14"/>
         <Button Content="Next" HorizontalAlignment="Left" Height="28" Margin="655,635,0,0" VerticalAlignment="Top" Width="80" FontSize="14" IsEnabled="False"/>
         <TextBox HorizontalAlignment="Left" Height="27" Margin="144,35,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="400" TextChanged="TextBoxAssetFolder_TextChanged" Name="textBox_AssetFolder"/>
         <Button Content="Browse" HorizontalAlignment="Left" Height="27" Margin="549,35,0,0" VerticalAlignment="Top" Width="80" FontSize="14" Click="Button_Click_Browse"/>
         <TextBlock HorizontalAlignment="Left" Height="27" Margin="34,35,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="105" FontSize="16" Text="Asset Folder"/>
         <Button Content="GO" HorizontalAlignment="Left" Height="27" Margin="646,35,0,0" VerticalAlignment="Top" Width="80" FontSize="14" Click="Button_Click_GO" Name="buttonNameAssetFolder"/>
-        <TextBox HorizontalAlignment="Left" Height="27" Margin="144,86,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="400" Name="textBoxTitleSstting" TextChanged="TextBoxTitleSstting_TextChanged"/>
-        <TextBlock HorizontalAlignment="Left" Height="27" Margin="34,86,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="105" FontSize="16" Text="Title Settings"/>
-        <Button Content="Clear" HorizontalAlignment="Left" Height="27" Margin="549,86,0,0" VerticalAlignment="Top" Width="80" FontSize="14" Click="Button_Click_1"/>
-        <Button Content="Select" HorizontalAlignment="Left" Height="27" Margin="646,84,0,0" VerticalAlignment="Top" Width="80" FontSize="14" Click="Button_Click_12"/>
+        <!--<TextBox HorizontalAlignment="Left" Height="27" Margin="144,86,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="400" Name="textBoxTitleSstting" TextChanged="TextBoxTitleSstting_TextChanged"/>-->
+        <!--<TextBlock HorizontalAlignment="Left" Height="27" Margin="34,86,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="105" FontSize="16" Text="Title Settings"/>-->
+        <!--<Button Content="Clear" HorizontalAlignment="Left" Height="27" Margin="549,86,0,0" VerticalAlignment="Top" Width="80" FontSize="14" Click="Button_Click_1"/>-->
+        <!--<Button Content="Select" HorizontalAlignment="Left" Height="27" Margin="646,84,0,0" VerticalAlignment="Top" Width="80" FontSize="14" Click="Button_Click_12"/>-->
         <Separator HorizontalAlignment="Left" Height="7" Margin="25,140,0,0" VerticalAlignment="Top" Width="710"/>
         <TextBox HorizontalAlignment="Left" Height="212" Margin="25,692,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="710" FontSize="14" Name="textBox_ShowProgress" TextChanged="TextBox_ShowProgress_TextChanged"/>
 

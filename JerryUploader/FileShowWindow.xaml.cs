@@ -142,10 +142,10 @@ namespace JerryUploader
         #endregion
 
         #region  ** All Clear Buttons **
-        private void Button_Click_1(object sender, RoutedEventArgs e)
-        {
-            ClearTheContentOfTextBox(textBoxTitleSstting);
-        }
+        //private void Button_Click_1(object sender, RoutedEventArgs e)
+        //{
+        //    ClearTheContentOfTextBox(textBoxTitleSstting);
+        //}
         private void Button_Click_3(object sender, RoutedEventArgs e)
         {
             ClearTheContentOfTextBox(textBoxCurrency);
@@ -194,10 +194,10 @@ namespace JerryUploader
         #endregion
 
         #region ** All Select Button **
-        private void Button_Click_12(object sender, RoutedEventArgs e)
-        {
-            SingleFileSelect(textBoxTitleSstting);
-        }
+        //private void Button_Click_12(object sender, RoutedEventArgs e)
+        //{
+        //    SingleFileSelect(textBoxTitleSstting);
+        //}
 
         private void Button_Click_13(object sender, RoutedEventArgs e)
         {
@@ -381,7 +381,7 @@ namespace JerryUploader
                 };
 
                 var createStatTask = PlayFabAdminAPI.CreatePlayerStatisticDefinitionAsync(request);
-                createStatTask.Wait();
+                await createStatTask;
 
                 if (createStatTask.Result.Error != null)
                 {
@@ -436,7 +436,7 @@ namespace JerryUploader
                 };
 
                 var addNewsTask = PlayFabAdminAPI.AddNewsAsync(request);
-                addNewsTask.Wait();
+                await addNewsTask;
 
                 if (addNewsTask.Result.Error != null)
                     OutputPlayFabError("\t\tTitleNews Upload: " + item.Title, addNewsTask.Result.Error);
@@ -475,7 +475,7 @@ namespace JerryUploader
             };
 
             var updateCloudScriptTask = PlayFabAdminAPI.UpdateCloudScriptAsync(request);
-            updateCloudScriptTask.Wait();
+            await  updateCloudScriptTask;
 
             if (updateCloudScriptTask.Result.Error != null)
             {
@@ -507,7 +507,7 @@ namespace JerryUploader
                 };
 
                 var setTitleDataTask = PlayFabAdminAPI.SetTitleDataAsync(request);
-                setTitleDataTask.Wait();
+                await  setTitleDataTask;
 
                 if (setTitleDataTask.Result.Error != null)
                     OutputPlayFabError("\t\tTitleData Upload: " + kvp.Key, setTitleDataTask.Result.Error);
@@ -529,7 +529,7 @@ namespace JerryUploader
             };
 
             var updateVcTask = PlayFabAdminAPI.AddVirtualCurrencyTypesAsync(request);
-            updateVcTask.Wait();
+            await  updateVcTask;
 
             if (updateVcTask.Result.Error != null)
             {
@@ -603,7 +603,7 @@ namespace JerryUploader
             };
 
             var updateResultTableTask = PlayFabAdminAPI.UpdateRandomResultTablesAsync(request);
-            updateResultTableTask.Wait();
+            await  updateResultTableTask;
 
             if (updateResultTableTask.Result.Error != null)
             {
@@ -638,7 +638,7 @@ namespace JerryUploader
                 };
 
                 var updateStoresTask = PlayFabAdminAPI.SetStoreItemsAsync(request);
-                updateStoresTask.Wait();
+                await  updateStoresTask;
 
                 if (updateStoresTask.Result.Error != null)
                     OutputPlayFabError("\t\tStore Upload: " + eachStore.StoreId, updateStoresTask.Result.Error);
@@ -665,7 +665,7 @@ namespace JerryUploader
                     {
                         var key = cdnPlatformSubfolder[eachPlatform] + bundleName;
                         var path = cdnPath + key;
-                        UploadAsset(key, path);
+                        await UploadAsset(key, path);
                     }
                 }
             }
@@ -821,5 +821,10 @@ namespace JerryUploader
             }
         }
         #endregion
+
+        private void Abort_Button_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
     }
 }

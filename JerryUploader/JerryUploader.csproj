@@ -72,6 +72,7 @@
       <DependentUpon>FileShowWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="FunctionHelper.cs" />
+    <Compile Include="ListCatalogItemData.cs" />
     <Compile Include="LoginWindow.xaml.cs">
       <DependentUpon>LoginWindow.xaml</DependentUpon>
     </Compile>

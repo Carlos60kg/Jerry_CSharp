@@ -282,7 +282,12 @@ namespace JerryUploader
                 // get the destination title settings
                 if (!GetTitleSettings())
                     throw new Exception("\tFailed to load Title Settings");
-
+                //await UploadTitleData();
+                //await UploadEconomyData();
+                //await UploadCloudScript();
+                //await UploadTitleNews();
+                //await UploadStatisticDefinitions();
+                //await UploadCdnAssets();
                 // start uploading
                 if (!await UploadTitleData())
                     throw new Exception("\tFailed to upload TitleData.");
@@ -337,17 +342,19 @@ namespace JerryUploader
         private async Task<bool> UploadEconomyData()
         {
             ////MUST upload these in this order so that the economy data is properly imported: VC -> Catalogs -> DropTables -> Stores
-            if (UploadVc().Result == false)
+            if (!await UploadVc())
                 return false;
 
-            var reUploadList = new List<CatalogItem>();
-            if (!UploadCatalog(ref reUploadList))
+            //var reUploadList = new List<CatalogItem>();
+            ListCatalogItemData listCatalogItemData = new ListCatalogItemData();
+            var reUploadList = listCatalogItemData.CataLogItems;
+            if (!await UploadCatalog())
                 return false;
 
-            if (UploadDropTables().Result == false)
+            if (!await UploadDropTables())
                 return false;
 
-            if (UploadStores().Result == false)
+            if (!await UploadStores())
                 return false;
 
             // workaround for the DropTable conflict
@@ -380,12 +387,12 @@ namespace JerryUploader
                     AggregationMethod = item.AggregationMethod
                 };
 
-                var createStatTask = PlayFabAdminAPI.CreatePlayerStatisticDefinitionAsync(request);
-                await createStatTask;
+                var createStatTask = await PlayFabAdminAPI.CreatePlayerStatisticDefinitionAsync(request);
 
-                if (createStatTask.Result.Error != null)
+
+                if (createStatTask.Error != null)
                 {
-                    if (createStatTask.Result.Error.Error == PlayFabErrorCode.StatisticNameConflict)
+                    if (createStatTask.Error.Error == PlayFabErrorCode.StatisticNameConflict)
                     {
                         LogToFile("\tStatistic Already Exists, Updating values: " + item.StatisticName);
                         var updateRequest = new UpdatePlayerStatisticDefinitionRequest()
@@ -395,16 +402,16 @@ namespace JerryUploader
                             AggregationMethod = item.AggregationMethod
                         };
 
-                        var updateStatTask = PlayFabAdminAPI.UpdatePlayerStatisticDefinitionAsync(updateRequest);
-                        updateStatTask.Wait();
-                        if (updateStatTask.Result.Error != null)
-                            OutputPlayFabError("\t\tStatistics Definition Error: " + item.StatisticName, updateStatTask.Result.Error);
+                        var updateStatTask = await PlayFabAdminAPI.UpdatePlayerStatisticDefinitionAsync(updateRequest);
+
+                        if (updateStatTask.Error != null)
+                            OutputPlayFabError("\t\tStatistics Definition Error: " + item.StatisticName, updateStatTask.Error);
                         else
                             LogToFile("\t\tStatistics Definition:" + item.StatisticName + " Updated");
                     }
                     else
                     {
-                        OutputPlayFabError("\t\tStatistics Definition Error: " + item.StatisticName, createStatTask.Result.Error);
+                        OutputPlayFabError("\t\tStatistics Definition Error: " + item.StatisticName, createStatTask.Error);
                     }
                 }
                 else
@@ -435,11 +442,10 @@ namespace JerryUploader
                     Body = item.Body
                 };
 
-                var addNewsTask = PlayFabAdminAPI.AddNewsAsync(request);
-                await addNewsTask;
+                var addNewsTask = await PlayFabAdminAPI.AddNewsAsync(request);
 
-                if (addNewsTask.Result.Error != null)
-                    OutputPlayFabError("\t\tTitleNews Upload: " + item.Title, addNewsTask.Result.Error);
+                if (addNewsTask.Error != null)
+                    OutputPlayFabError("\t\tTitleNews Upload: " + item.Title, addNewsTask.Error);
                 else
                     LogToFile("\t\t" + item.Title + " Uploaded.");
             }
@@ -474,12 +480,11 @@ namespace JerryUploader
                 Files = files
             };
 
-            var updateCloudScriptTask = PlayFabAdminAPI.UpdateCloudScriptAsync(request);
-            await  updateCloudScriptTask;
+            var updateCloudScriptTask = await PlayFabAdminAPI.UpdateCloudScriptAsync(request);
 
-            if (updateCloudScriptTask.Result.Error != null)
+            if (updateCloudScriptTask.Error != null)
             {
-                OutputPlayFabError("\tCloudScript Upload Error: ", updateCloudScriptTask.Result.Error);
+                OutputPlayFabError("\tCloudScript Upload Error: ", updateCloudScriptTask.Error);
                 return false;
             }
 
@@ -506,11 +511,11 @@ namespace JerryUploader
                     Value = kvp.Value
                 };
 
-                var setTitleDataTask = PlayFabAdminAPI.SetTitleDataAsync(request);
-                await  setTitleDataTask;
+                var setTitleDataTask = await PlayFabAdminAPI.SetTitleDataAsync(request);
 
-                if (setTitleDataTask.Result.Error != null)
-                    OutputPlayFabError("\t\tTitleData Upload: " + kvp.Key, setTitleDataTask.Result.Error);
+
+                if (setTitleDataTask.Error != null)
+                    OutputPlayFabError("\t\tTitleData Upload: " + kvp.Key, setTitleDataTask.Error);
                 else
                     LogToFile("\t\t" + kvp.Key + " Uploaded.");
             }
@@ -528,12 +533,11 @@ namespace JerryUploader
                 VirtualCurrencies = vcData
             };
 
-            var updateVcTask = PlayFabAdminAPI.AddVirtualCurrencyTypesAsync(request);
-            await  updateVcTask;
+            var updateVcTask = await PlayFabAdminAPI.AddVirtualCurrencyTypesAsync(request);
 
-            if (updateVcTask.Result.Error != null)
+            if (updateVcTask.Error != null)
             {
-                OutputPlayFabError("\tVC Upload Error: ", updateVcTask.Result.Error);
+                OutputPlayFabError("\tVC Upload Error: ", updateVcTask.Error);
                 return false;
             }
 
@@ -541,8 +545,9 @@ namespace JerryUploader
             return true;
         }
 
-        private bool UploadCatalog(ref List<CatalogItem> reUploadList)
+        private async Task<bool> UploadCatalog()
         {
+            List<CatalogItem> reUploadList = new ListCatalogItemData().CataLogItems;
             if (string.IsNullOrEmpty(catalogPath))
                 return false;
 
@@ -560,15 +565,19 @@ namespace JerryUploader
                 if (catalogWrapper.Catalog[z].Bundle != null || catalogWrapper.Catalog[z].Container != null)
                 {
                     var original = catalogWrapper.Catalog[z];
-                    var strippedClone = CloneCatalogItemAndStripTables(original);
+                    var strippedClone =  CloneCatalogItemAndStripTables(original);
 
-                    reUploadList.Add(original);
+                    //reUploadList.Add(original);
+                    await AddCatalogAsync(reUploadList, original);
                     catalogWrapper.Catalog.Remove(original);
                     catalogWrapper.Catalog.Add(strippedClone);
                 }
             }
-
             return UpdateCatalog(catalogWrapper.Catalog).Result;
+        }
+        private async Task AddCatalogAsync(List<CatalogItem> catalogItems, CatalogItem catalogItem)
+        {
+            catalogItems.Add(catalogItem);
         }
 
         private async Task<bool> UploadDropTables()
@@ -602,12 +611,11 @@ namespace JerryUploader
                 Tables = dropTables
             };
 
-            var updateResultTableTask = PlayFabAdminAPI.UpdateRandomResultTablesAsync(request);
-            await  updateResultTableTask;
+            var updateResultTableTask = await PlayFabAdminAPI.UpdateRandomResultTablesAsync(request);
 
-            if (updateResultTableTask.Result.Error != null)
+            if (updateResultTableTask.Error != null)
             {
-                OutputPlayFabError("\tDropTable Upload Error: ", updateResultTableTask.Result.Error);
+                OutputPlayFabError("\tDropTable Upload Error: ", updateResultTableTask.Error);
                 return false;
             }
 
@@ -637,11 +645,10 @@ namespace JerryUploader
                     MarketingData = eachStore.MarketingData
                 };
 
-                var updateStoresTask = PlayFabAdminAPI.SetStoreItemsAsync(request);
-                await  updateStoresTask;
+                var updateStoresTask = await PlayFabAdminAPI.SetStoreItemsAsync(request);
 
-                if (updateStoresTask.Result.Error != null)
-                    OutputPlayFabError("\t\tStore Upload: " + eachStore.StoreId, updateStoresTask.Result.Error);
+                if (updateStoresTask.Error != null)
+                    OutputPlayFabError("\t\tStore Upload: " + eachStore.StoreId, updateStoresTask.Error);
                 else
                     LogToFile("\t\tStore: " + eachStore.StoreId + " Uploaded. ");
             }
@@ -665,7 +672,7 @@ namespace JerryUploader
                     {
                         var key = cdnPlatformSubfolder[eachPlatform] + bundleName;
                         var path = cdnPath + key;
-                        await UploadAsset(key, path);
+                        await UploadAssetAsync(key, path);
                     }
                 }
             }
@@ -683,7 +690,8 @@ namespace JerryUploader
         {
             //Console.WriteLine(content);
             //Dispatcher.BeginInvoke(new Action(() => textBox_ShowProgress.Text = content));
-            textBox_ShowProgress.Text += content;
+            textBox_ShowProgress.Text += content + "\n";
+
             logStream.WriteLine(content);
         }
 
@@ -749,12 +757,11 @@ namespace JerryUploader
                 Catalog = catalog
             };
 
-            var updateCatalogItemsTask = PlayFabAdminAPI.UpdateCatalogItemsAsync(request);
-            await updateCatalogItemsTask;
+            var updateCatalogItemsTask = await PlayFabAdminAPI.UpdateCatalogItemsAsync(request);
 
-            if (updateCatalogItemsTask.Result.Error != null)
+            if (updateCatalogItemsTask.Error != null)
             {
-                OutputPlayFabError("\tCatalog Upload Error: ", updateCatalogItemsTask.Result.Error);
+                OutputPlayFabError("\tCatalog Upload Error: ", updateCatalogItemsTask.Error);
                 return false;
             }
 
@@ -762,7 +769,7 @@ namespace JerryUploader
             return true;
         }
 
-        private async Task<bool> UploadAsset(string key, string path)
+        private async Task<bool> UploadAssetAsync(string key, string path)
         {
             var request = new GetContentUploadUrlRequest()
             {
@@ -771,16 +778,15 @@ namespace JerryUploader
             };
 
             LogToFile("\tFetching CDN endpoint for " + key);
-            var getContentUploadTask = PlayFabAdminAPI.GetContentUploadUrlAsync(request);
-            await getContentUploadTask;
+            var getContentUploadTask = await PlayFabAdminAPI.GetContentUploadUrlAsync(request);
 
-            if (getContentUploadTask.Result.Error != null)
+            if (getContentUploadTask.Error != null)
             {
-                OutputPlayFabError("\t\tAcquire CDN URL Error: ", getContentUploadTask.Result.Error);
+                OutputPlayFabError("\t\tAcquire CDN URL Error: ", getContentUploadTask.Error);
                 return false;
             }
 
-            var destUrl = getContentUploadTask.Result.Result.URL;
+            var destUrl = getContentUploadTask.Result.URL;
             LogToFile("\t\tAcquired CDN Address: " + key);
 
             byte[] fileContents = File.ReadAllBytes(path);

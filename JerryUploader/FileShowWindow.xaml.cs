@@ -18,6 +18,7 @@ using System.Net.Http;
 using PlayFab;
 using PlayFab.AdminModels;
 using PlayFab.Json;
+using System.Threading;
 namespace JerryUploader
 {
     /// <summary>
@@ -252,7 +253,7 @@ namespace JerryUploader
         private static FileInfo logFile;
         private static StreamWriter logStream;
 
-        //CDN
+        #region CDN
         public enum CdnPlatform { Desktop, iOS, Android }
         public static readonly Dictionary<CdnPlatform, string> cdnPlatformSubfolder = new Dictionary<CdnPlatform, string> {
             { CdnPlatform.Desktop, "" },
@@ -260,18 +261,16 @@ namespace JerryUploader
             { CdnPlatform.Android, "Android/" },
         };
         public static string cdnPath = "./PlayFabData/AssetBundles/";
-
-        /// <summary>
-        /// i dont know if it is feasible to add the async modifier to this method ...
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        /// <returns></returns>
+        #endregion
+        
         private async void Button_Click_Upload(object sender, RoutedEventArgs e)
         {
-            await UploadFilesAsync();
+            canceller = new CancellationTokenSource();
+            CancellationToken token = canceller.Token;
+            
+            await UploadFilesAsync(token);
         }
-        private async Task UploadFilesAsync()
+        private async Task UploadFilesAsync(CancellationToken token)
         {
             try
             {
@@ -280,26 +279,20 @@ namespace JerryUploader
                 logStream = logFile.CreateText();
 
                 // get the destination title settings
-                if (!GetTitleSettings())
+                if (!GetTitleSettings(token))
                     throw new Exception("\tFailed to load Title Settings");
-                //await UploadTitleData();
-                //await UploadEconomyData();
-                //await UploadCloudScript();
-                //await UploadTitleNews();
-                //await UploadStatisticDefinitions();
-                //await UploadCdnAssets();
                 // start uploading
-                if (!await UploadTitleData())
+                if (!await UploadTitleData(token))
                     throw new Exception("\tFailed to upload TitleData.");
-                if (!await UploadEconomyData())
+                if (!await UploadEconomyData(token))
                     throw new Exception("\tFailed to upload Economy Data.");
-                if (!await UploadCloudScript())
+                if (!await UploadCloudScript(token))
                     throw new Exception("\tFailed to upload CloudScript.");
-                if (!await UploadTitleNews())
+                if (!await UploadTitleNews(token))
                     throw new Exception("\tFailed to upload TitleNews.");
-                if (!await UploadStatisticDefinitions())
+                if (!await UploadStatisticDefinitions(token))
                     throw new Exception("\tFailed to upload Statistics Definitions.");
-                if (!await UploadCdnAssets())
+                if (!await UploadCdnAssets(token))
                     throw new Exception("\tFailed to upload CDN Assets.");
             }
             catch (Exception ex)
@@ -318,8 +311,14 @@ namespace JerryUploader
             }
         }
 
-        private bool GetTitleSettings()
+        private bool GetTitleSettings(CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+            {
+                LogToFile("Canceled Uploading by user!");
+                return false;
+            }
+
             var parsedFile = ParseFile(titleSettingsPath);
             var titleSettings = JsonWrapper.DeserializeObject<Dictionary<string, string>>(parsedFile);
 
@@ -339,35 +338,47 @@ namespace JerryUploader
         }
 
         #region Uploading Functions -- these are straightforward calls that push the data to the backend
-        private async Task<bool> UploadEconomyData()
+        private async Task<bool> UploadEconomyData(CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+            {
+                LogToFile("Canceled Uploading by user!");
+                return false;
+            }
+
             ////MUST upload these in this order so that the economy data is properly imported: VC -> Catalogs -> DropTables -> Stores
-            if (!await UploadVc())
+            if (!await UploadVc(token))
                 return false;
 
             //var reUploadList = new List<CatalogItem>();
             ListCatalogItemData listCatalogItemData = new ListCatalogItemData();
             var reUploadList = listCatalogItemData.CataLogItems;
-            if (!await UploadCatalog())
+            if (!await UploadCatalog( reUploadList,token))
                 return false;
 
-            if (!await UploadDropTables())
+            if (!await UploadDropTables(token))
                 return false;
 
-            if (!await UploadStores())
+            if (!await UploadStores(token))
                 return false;
 
             // workaround for the DropTable conflict
             if (reUploadList.Count > 0)
             {
                 LogToFile("Re-uploading [" + reUploadList.Count + "] CatalogItems due to DropTable conflicts...");
-                await UpdateCatalog(reUploadList);
+                await UpdateCatalogAsync(reUploadList,token);
             }
             return true;
         }
 
-        private async Task<bool> UploadStatisticDefinitions()
+        private async Task<bool> UploadStatisticDefinitions( CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+            {
+                LogToFile("Canceled Uploading by user!");
+                return false;
+            }
+
             if (string.IsNullOrEmpty(statsDefPath))
                 return false;
 
@@ -422,8 +433,14 @@ namespace JerryUploader
             return true;
         }
 
-        private async Task<bool> UploadTitleNews()
+        private async Task<bool> UploadTitleNews( CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+            {
+                LogToFile("Canceled Uploading by user!");
+                return false;
+            }
+
             if (string.IsNullOrEmpty(titleNewsPath))
                 return false;
 
@@ -453,8 +470,14 @@ namespace JerryUploader
             return true;
         }
 
-        private async Task<bool> UploadCloudScript()
+        private async Task<bool> UploadCloudScript(CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+            {
+                LogToFile("Canceled Uploading by user!");
+                return false;
+            }
+
             if (string.IsNullOrEmpty(cloudScriptPath))
                 return false;
 
@@ -492,15 +515,20 @@ namespace JerryUploader
             return true;
         }
 
-        private async Task<bool> UploadTitleData()
+        private async Task<bool> UploadTitleData(CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+            {
+                LogToFile("Canceled Uploading by user!");
+                return false;
+            }
+
             if (string.IsNullOrEmpty(titleDataPath))
                 return false;
 
             LogToFile("Uploading Title Data Keys & Values...");
             var parsedFile = ParseFile(titleDataPath);
             var titleDataDict = JsonWrapper.DeserializeObject<Dictionary<string, string>>(parsedFile);
-
             foreach (var kvp in titleDataDict)
             {
                 LogToFile("\tUploading: " + kvp.Key);
@@ -523,8 +551,14 @@ namespace JerryUploader
             return true;
         }
 
-        private async Task<bool> UploadVc()
+        private async Task<bool> UploadVc( CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+            {
+                LogToFile("Canceled Uploading by user!");
+                return false;
+            }
+
             LogToFile("Uploading Virtual Currency Settings...");
             var parsedFile = ParseFile(currencyPath);
             var vcData = JsonWrapper.DeserializeObject<List<VirtualCurrencyData>>(parsedFile);
@@ -533,8 +567,8 @@ namespace JerryUploader
                 VirtualCurrencies = vcData
             };
 
+            //LogToFile("This is a test code -- This is a test code");
             var updateVcTask = await PlayFabAdminAPI.AddVirtualCurrencyTypesAsync(request);
-
             if (updateVcTask.Error != null)
             {
                 OutputPlayFabError("\tVC Upload Error: ", updateVcTask.Error);
@@ -545,9 +579,14 @@ namespace JerryUploader
             return true;
         }
 
-        private async Task<bool> UploadCatalog()
+        private async Task<bool> UploadCatalog( List<CatalogItem> reUploadList, CancellationToken token)
         {
-            List<CatalogItem> reUploadList = new ListCatalogItemData().CataLogItems;
+            if (token.IsCancellationRequested)
+            {
+                LogToFile("Canceled Uploading by user!");
+                return false;
+            }
+
             if (string.IsNullOrEmpty(catalogPath))
                 return false;
 
@@ -565,23 +604,26 @@ namespace JerryUploader
                 if (catalogWrapper.Catalog[z].Bundle != null || catalogWrapper.Catalog[z].Container != null)
                 {
                     var original = catalogWrapper.Catalog[z];
-                    var strippedClone =  CloneCatalogItemAndStripTables(original);
+                    var strippedClone = CloneCatalogItemAndStripTables(original);
 
-                    //reUploadList.Add(original);
-                    await AddCatalogAsync(reUploadList, original);
+                    reUploadList.Add(original);
                     catalogWrapper.Catalog.Remove(original);
                     catalogWrapper.Catalog.Add(strippedClone);
                 }
             }
-            return UpdateCatalog(catalogWrapper.Catalog).Result;
-        }
-        private async Task AddCatalogAsync(List<CatalogItem> catalogItems, CatalogItem catalogItem)
-        {
-            catalogItems.Add(catalogItem);
+
+            return await UpdateCatalogAsync(catalogWrapper.Catalog,token);
         }
 
-        private async Task<bool> UploadDropTables()
+
+        private async Task<bool> UploadDropTables(CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+            {
+                LogToFile("Canceled Uploading by user!");
+                return false;
+            }
+
             if (string.IsNullOrEmpty(dropTablesPath))
                 return false;
 
@@ -623,8 +665,14 @@ namespace JerryUploader
             return true;
         }
 
-        private async Task<bool> UploadStores()
+        private async Task<bool> UploadStores(CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+            {
+                LogToFile("Canceled Uploading by user!");
+                return false;
+            }
+
             if (string.IsNullOrEmpty(storesPath))
                 return false;
 
@@ -655,8 +703,14 @@ namespace JerryUploader
             return true;
         }
 
-        private async Task<bool> UploadCdnAssets()
+        private async Task<bool> UploadCdnAssets( CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+            {
+                LogToFile("Canceled Uploading by user!");
+                return false;
+            }
+
             if (string.IsNullOrEmpty(cdnAssetsPath))
                 return false;
 
@@ -672,7 +726,7 @@ namespace JerryUploader
                     {
                         var key = cdnPlatformSubfolder[eachPlatform] + bundleName;
                         var path = cdnPath + key;
-                        await UploadAssetAsync(key, path);
+                        await UploadAssetAsync(key, path,token);
                     }
                 }
             }
@@ -749,8 +803,14 @@ namespace JerryUploader
             };
         }
 
-        private async Task<bool> UpdateCatalog(List<CatalogItem> catalog)
+        private async Task<bool> UpdateCatalogAsync(List<CatalogItem> catalog,CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+            {
+                LogToFile("Canceled Uploading by user!");
+                return false;
+            }
+
             var request = new UpdateCatalogItemsRequest
             {
                 CatalogVersion = defaultCatalog,
@@ -769,8 +829,14 @@ namespace JerryUploader
             return true;
         }
 
-        private async Task<bool> UploadAssetAsync(string key, string path)
+        private async Task<bool> UploadAssetAsync(string key, string path, CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+            {
+                LogToFile("Canceled Uploading by user!");
+                return false;
+            }
+
             var request = new GetContentUploadUrlRequest()
             {
                 Key = key,
@@ -828,9 +894,16 @@ namespace JerryUploader
         }
         #endregion
 
+        #region Abort Uploading 
+        
+        CancellationTokenSource canceller;
         private void Abort_Button_Click(object sender, RoutedEventArgs e)
         {
-
+            if (canceller != null)
+            {
+                canceller.Cancel();
+            }
         }
+        #endregion
     }
 }

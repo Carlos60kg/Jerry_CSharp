@@ -40,16 +40,16 @@ namespace JerryUploader
 
         private void Button_Click_1(object sender, RoutedEventArgs e)
         {
-            //if (user_Email.Text == username && user_Password.Text == password)
-            //{
+            if (user_Email.Text == username && user_Password.Text == password)
+            {
                 FileShowWindow fileShow = new FileShowWindow();
                 fileShow.Show();
                 Close();
-            //}
-            //else
-            //{
-            //    System.Windows.MessageBox.Show("Please enter the correct username or password");
-            //}
+            }
+            else
+            {
+                System.Windows.MessageBox.Show("Please enter the correct username or password");
+            }
         }
 
 

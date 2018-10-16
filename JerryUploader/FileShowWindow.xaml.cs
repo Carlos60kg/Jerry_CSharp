@@ -267,20 +267,20 @@ namespace JerryUploader
                 logStream = logFile.CreateText();
 
                 // get the destination title settings
-                if (!GetTitleSettings(token))
+                if (!GetTitleSettings())
                     throw new Exception("\tFailed to load Title Settings");
                 // start uploading
-                if (!await UploadTitleData(token))
+                if (!await Upload_Delegate(titleDataPath, "Title Data keys & Values", token, TitleData))
                     throw new Exception("\tFailed to upload TitleData.");
                 if (!await UploadEconomyData(token))
                     throw new Exception("\tFailed to upload Economy Data.");
-                if (!await UploadCloudScript(token))
+                if(!await Upload_Delegate(cloudScriptPath, "Cloud Script", token, CloudScript))
                     throw new Exception("\tFailed to upload CloudScript.");
-                if (!await UploadTitleNews(token))
-                    throw new Exception("\tFailed to upload TitleNews.");
-                if (!await UploadStatisticDefinitions(token))
+                if(!await Upload_Delegate(titleNewsPath, "TitleNews", token, TitleNews))
+                    throw new Exception("\tFailed to upload Title News.");
+                if (!await Upload_Delegate(statsDefPath, "Statistics Definitions", token, StatisticDefination))
                     throw new Exception("\tFailed to upload Statistics Definitions.");
-                if (!await UploadCdnAssets(token))
+                if(!await Upload_Delegate(cdnAssetsPath, "CDN Assets", token, CDNAssets))
                     throw new Exception("\tFailed to upload CDN Assets.");
             }
             catch (Exception ex)
@@ -299,11 +299,8 @@ namespace JerryUploader
             }
         }
 
-        private bool GetTitleSettings(CancellationToken token)
+        private bool GetTitleSettings()
         {
-            if (IsCancellationRequest(token))
-                return false;
-
             var parsedFile = ParseFile(titleSettingsPath);
             var titleSettings = JsonWrapper.DeserializeObject<Dictionary<string, string>>(parsedFile);
 
@@ -325,43 +322,108 @@ namespace JerryUploader
         #region Uploading Functions -- these are straightforward calls that push the data to the backend
         private async Task<bool> UploadEconomyData(CancellationToken token)
         {
+            var reUploadList = new List<CatalogItem>();
             if (IsCancellationRequest(token))
                 return false;
 
             ////MUST upload these in this order so that the economy data is properly imported: VC -> Catalogs -> DropTables -> Stores
-            if (!await UploadVc(token))
+            if (!await Upload_Delegate(currencyPath, "Virtual Currency", token, VirtualCurrency))
                 return false;
             
-            var reUploadList = new List<CatalogItem>();
-            if (!await UploadCatalog( reUploadList,token))
+            if (!await UploadCatalog(reUploadList, token))
                 return false;
 
-            if (!await UploadDropTables(token))
+            if (!await Upload_Delegate(dropTablesPath, "DropTables", token, DropTables))
                 return false;
-
-            if (!await UploadStores(token))
+            
+            if (!await Upload_Delegate(storesPath, "Stores", token, Stores))
                 return false;
 
             // workaround for the DropTable conflict
             if (reUploadList.Count > 0)
             {
                 LogToFile("Re-uploading [" + reUploadList.Count + "] CatalogItems due to DropTable conflicts...");
-                await UpdateCatalogAsync(reUploadList,token);
+                await UpdateCatalogAsync(reUploadList, token);
             }
             return true;
         }
-
-        private async Task<bool> UploadStatisticDefinitions( CancellationToken token)
+        private async Task< bool> UploadCatalog(List<CatalogItem> reUploadList, CancellationToken token)
         {
             if (IsCancellationRequest(token))
                 return false;
 
-            if (string.IsNullOrEmpty(statsDefPath))
+            if (string.IsNullOrEmpty(catalogPath))
                 return false;
 
-            LogToFile("Updating Player Statistics Definitions ...");
-            var parsedFile = ParseFile(statsDefPath);
+            LogToFile("Uploading CatalogItems...");
+            var parsedFile = ParseFile(catalogPath);
 
+            var catalogWrapper = JsonWrapper.DeserializeObject<CatalogWrapper>(parsedFile);
+            if (catalogWrapper == null)
+            {
+                LogToFile("\tAn error occurred deserializing the Catalog.json file.");
+                return false;
+            }
+            for (var z = 0; z < catalogWrapper.Catalog.Count; z++)
+            {
+                if (IsCancellationRequest(token))
+                    return false;
+                if (catalogWrapper.Catalog[z].Bundle != null || catalogWrapper.Catalog[z].Container != null)
+                {
+                    var original = catalogWrapper.Catalog[z];
+                    var strippedClone = CloneCatalogItemAndStripTables(original);
+
+                    reUploadList.Add(original);
+                    catalogWrapper.Catalog.Remove(original);
+                    catalogWrapper.Catalog.Add(strippedClone);
+                }
+            }
+
+            return await UpdateCatalogAsync(catalogWrapper.Catalog, token);
+        }
+
+        private async Task<bool> Upload_Delegate(string filePath, string fileName, CancellationToken token, Func<string,CancellationToken, Task<bool>> func)
+        {
+            if (IsCancellationRequest(token))
+                return false;
+
+            if (string.IsNullOrEmpty(filePath))
+                return false;
+            LogToFile("Uploading " + fileName + "...");
+            var parsedFile = ParseFile(filePath);
+
+            return await func(parsedFile,token);
+        }
+
+        #endregion
+
+        #region Parameters of Delegatet
+        private async Task<bool> TitleData(string parsedFile,CancellationToken token)
+        {
+            var titleDataDict = JsonWrapper.DeserializeObject<Dictionary<string, string>>(parsedFile);
+            foreach (var kvp in titleDataDict)
+            {
+                if (IsCancellationRequest(token))
+                    return false;
+                LogToFile("\tUploading: " + kvp.Key);
+
+                var request = new SetTitleDataRequest()
+                {
+                    Key = kvp.Key,
+                    Value = kvp.Value
+                };
+
+                var setTitleDataTask = await PlayFabAdminAPI.SetTitleDataAsync(request);
+
+                if (setTitleDataTask.Error != null)
+                    OutputPlayFabError("\t\tTitleData Upload: " + kvp.Key, setTitleDataTask.Error);
+                else
+                    LogToFile("\t\t" + kvp.Key + " Uploaded.");
+            }
+            return true;
+        }
+        private async Task<bool> StatisticDefination(string parsedFile,CancellationToken token)
+        {
             var statisticDefinitions = JsonWrapper.DeserializeObject<List<PlayerStatisticDefinition>>(parsedFile);
 
             foreach (var item in statisticDefinitions)
@@ -378,8 +440,7 @@ namespace JerryUploader
                 };
 
                 var createStatTask = await PlayFabAdminAPI.CreatePlayerStatisticDefinitionAsync(request);
-
-
+                
                 if (createStatTask.Error != null)
                 {
                     if (createStatTask.Error.Error == PlayFabErrorCode.StatisticNameConflict)
@@ -412,52 +473,8 @@ namespace JerryUploader
             }
             return true;
         }
-
-        private async Task<bool> UploadTitleNews( CancellationToken token)
+        private async Task<bool> CloudScript(string parsedFile, CancellationToken token)
         {
-            if (IsCancellationRequest(token))
-                return false;
-
-            if (string.IsNullOrEmpty(titleNewsPath))
-                return false;
-
-            LogToFile("Uploading TitleNews...");
-            var parsedFile = ParseFile(titleNewsPath);
-
-            var titleNewsItems = JsonWrapper.DeserializeObject<List<PlayFab.ServerModels.TitleNewsItem>>(parsedFile);
-
-            foreach (var item in titleNewsItems)
-            {
-                LogToFile("\tUploading: " + item.Title);
-
-                var request = new AddNewsRequest()
-                {
-                    Title = item.Title,
-                    Body = item.Body
-                };
-
-                var addNewsTask = await PlayFabAdminAPI.AddNewsAsync(request);
-
-                if (addNewsTask.Error != null)
-                    OutputPlayFabError("\t\tTitleNews Upload: " + item.Title, addNewsTask.Error);
-                else
-                    LogToFile("\t\t" + item.Title + " Uploaded.");
-            }
-
-            return true;
-        }
-
-        private async Task<bool> UploadCloudScript(CancellationToken token)
-        {
-            if (IsCancellationRequest(token))
-                return false;
-
-            if (string.IsNullOrEmpty(cloudScriptPath))
-                return false;
-
-            LogToFile("Uploading CloudScript...");
-            var parsedFile = ParseFile(cloudScriptPath);
-
             if (parsedFile == null)
             {
                 LogToFile("\tAn error occurred deserializing the CloudScript.js file.");
@@ -489,113 +506,84 @@ namespace JerryUploader
             LogToFile("\tUploaded CloudScript!");
             return true;
         }
-
-        private async Task<bool> UploadTitleData(CancellationToken token)
+        private async Task<bool> TitleNews(string parsedFile, CancellationToken token)
         {
-            if (IsCancellationRequest(token))
-                return false;
+            var titleNewsItems = JsonWrapper.DeserializeObject<List<PlayFab.ServerModels.TitleNewsItem>>(parsedFile);
 
-            if (string.IsNullOrEmpty(titleDataPath))
-                return false;
-
-            LogToFile("Uploading Title Data Keys & Values...");
-            var parsedFile = ParseFile(titleDataPath);
-            var titleDataDict = JsonWrapper.DeserializeObject<Dictionary<string, string>>(parsedFile);
-            foreach (var kvp in titleDataDict)
+            foreach (var item in titleNewsItems)
             {
-                if (IsCancellationRequest(token))
-                    return false;
+                LogToFile("\tUploading: " + item.Title);
 
-                LogToFile("\tUploading: " + kvp.Key);
-
-                var request = new SetTitleDataRequest()
+                var request = new AddNewsRequest()
                 {
-                    Key = kvp.Key,
-                    Value = kvp.Value
+                    Title = item.Title,
+                    Body = item.Body
                 };
 
-                var setTitleDataTask = await PlayFabAdminAPI.SetTitleDataAsync(request);
+                var addNewsTask = await PlayFabAdminAPI.AddNewsAsync(request);
 
-                if (setTitleDataTask.Error != null)
-                    OutputPlayFabError("\t\tTitleData Upload: " + kvp.Key, setTitleDataTask.Error);
+                if (addNewsTask.Error != null)
+                    OutputPlayFabError("\t\tTitleNews Upload: " + item.Title, addNewsTask.Error);
                 else
-                    LogToFile("\t\t" + kvp.Key + " Uploaded.");
+                    LogToFile("\t\t" + item.Title + " Uploaded.");
             }
 
             return true;
         }
-
-        private async Task<bool> UploadVc( CancellationToken token)
+        private async Task<bool> CDNAssets(string parsedFile, CancellationToken token)
         {
-            if (IsCancellationRequest(token))
-                return false;
+            var bundleNames = JsonWrapper.DeserializeObject<List<string>>(parsedFile); // TODO: This could probably just read the list of files from the directory
 
-            LogToFile("Uploading Virtual Currency Settings...");
-            var parsedFile = ParseFile(currencyPath);
-            var vcData = JsonWrapper.DeserializeObject<List<VirtualCurrencyData>>(parsedFile);
-            var request = new AddVirtualCurrencyTypesRequest
+            if (bundleNames != null)
             {
-                VirtualCurrencies = vcData
-            };
-
-            
-            var updateVcTask = await PlayFabAdminAPI.AddVirtualCurrencyTypesAsync(request);
-            if (updateVcTask.Error != null)
+                foreach (var bundleName in bundleNames)
+                {
+                    if (IsCancellationRequest(token))
+                        return false;
+                    foreach (CdnPlatform eachPlatform in Enum.GetValues(typeof(CdnPlatform)))
+                    {
+                        var key = cdnPlatformSubfolder[eachPlatform] + bundleName;
+                        var path = cdnPath + key;
+                        await UploadAssetAsync(key, path, token);
+                    }
+                }
+            }
+            else
             {
-                OutputPlayFabError("\tVC Upload Error: ", updateVcTask.Error);
+                LogToFile("\tAn error occurred deserializing CDN Assets: ");
                 return false;
             }
-
-            LogToFile("\tUploaded VC!");
             return true;
         }
-
-        private async Task<bool> UploadCatalog( List<CatalogItem> reUploadList, CancellationToken token)
+        private async Task<bool> Stores(string parsedFile, CancellationToken token)
         {
-            if (IsCancellationRequest(token))
-                return false;
+            var storesList = JsonWrapper.DeserializeObject<List<StoreWrapper>>(parsedFile);
 
-            if (string.IsNullOrEmpty(catalogPath))
-                return false;
-
-            LogToFile("Uploading CatalogItems...");
-            var parsedFile = ParseFile(catalogPath);
-
-            var catalogWrapper = JsonWrapper.DeserializeObject<CatalogWrapper>(parsedFile);
-            if (catalogWrapper == null)
-            {
-                LogToFile("\tAn error occurred deserializing the Catalog.json file.");
-                return false;
-            }
-            for (var z = 0; z < catalogWrapper.Catalog.Count; z++)
+            foreach (var eachStore in storesList)
             {
                 if (IsCancellationRequest(token))
                     return false;
-                if (catalogWrapper.Catalog[z].Bundle != null || catalogWrapper.Catalog[z].Container != null )
+                LogToFile("\tUploading: " + eachStore.StoreId);
+
+                var request = new UpdateStoreItemsRequest
                 {
-                    var original = catalogWrapper.Catalog[z];
-                    var strippedClone = CloneCatalogItemAndStripTables(original);
+                    CatalogVersion = defaultCatalog,
+                    StoreId = eachStore.StoreId,
+                    Store = eachStore.Store,
+                    MarketingData = eachStore.MarketingData
+                };
 
-                    reUploadList.Add(original);
-                    catalogWrapper.Catalog.Remove(original);
-                    catalogWrapper.Catalog.Add(strippedClone);
-                }
+                var updateStoresTask = await PlayFabAdminAPI.SetStoreItemsAsync(request);
+
+                if (updateStoresTask.Error != null)
+                    OutputPlayFabError("\t\tStore Upload: " + eachStore.StoreId, updateStoresTask.Error);
+                else
+                    LogToFile("\t\tStore: " + eachStore.StoreId + " Uploaded. ");
             }
-
-            return await UpdateCatalogAsync(catalogWrapper.Catalog,token);
+            return true;
         }
-
-        private async Task<bool> UploadDropTables(CancellationToken token)
+        private async Task<bool> DropTables(string parsedFile, CancellationToken token)
         {
-            if (IsCancellationRequest(token))
-                return false;
-
-            if (string.IsNullOrEmpty(dropTablesPath))
-                return false;
-
-            LogToFile("Uploading DropTables...");
-            var parsedFile = ParseFile(dropTablesPath);
-
             var dtDict = JsonWrapper.DeserializeObject<Dictionary<string, RandomResultTableListing>>(parsedFile);
             if (dtDict == null)
             {
@@ -632,75 +620,22 @@ namespace JerryUploader
             LogToFile("\tUploaded DropTables!");
             return true;
         }
-
-        private async Task<bool> UploadStores(CancellationToken token)
+        private async Task<bool> VirtualCurrency(string parsedFile, CancellationToken token)
         {
-            if (IsCancellationRequest(token))
-                return false;
-
-            if (string.IsNullOrEmpty(storesPath))
-                return false;
-
-            LogToFile("Uploading Stores...");
-            var parsedFile = ParseFile(storesPath);
-
-            var storesList = JsonWrapper.DeserializeObject<List<StoreWrapper>>(parsedFile);
-
-            foreach (var eachStore in storesList)
+            var vcData = JsonWrapper.DeserializeObject<List<VirtualCurrencyData>>(parsedFile);
+            var request = new AddVirtualCurrencyTypesRequest
             {
-                if (IsCancellationRequest(token))
-                    return false;
-                LogToFile("\tUploading: " + eachStore.StoreId);
+                VirtualCurrencies = vcData
+            };
 
-                var request = new UpdateStoreItemsRequest
-                {
-                    CatalogVersion = defaultCatalog,
-                    StoreId = eachStore.StoreId,
-                    Store = eachStore.Store,
-                    MarketingData = eachStore.MarketingData
-                };
-
-                var updateStoresTask = await PlayFabAdminAPI.SetStoreItemsAsync(request);
-
-                if (updateStoresTask.Error != null)
-                    OutputPlayFabError("\t\tStore Upload: " + eachStore.StoreId, updateStoresTask.Error);
-                else
-                    LogToFile("\t\tStore: " + eachStore.StoreId + " Uploaded. ");
-            }
-            return true;
-        }
-
-        private async Task<bool> UploadCdnAssets( CancellationToken token)
-        {
-            if (IsCancellationRequest(token))
-                return false;
-
-            if (string.IsNullOrEmpty(cdnAssetsPath))
-                return false;
-
-            LogToFile("Uploading CDN AssetBundles...");
-            var parsedFile = ParseFile(cdnAssetsPath);
-            var bundleNames = JsonWrapper.DeserializeObject<List<string>>(parsedFile); // TODO: This could probably just read the list of files from the directory
-
-            if (bundleNames != null)
+            var updateVcTask = await PlayFabAdminAPI.AddVirtualCurrencyTypesAsync(request);
+            if (updateVcTask.Error != null)
             {
-                foreach (var bundleName in bundleNames)
-                {
-                    if (IsCancellationRequest(token))
-                        return false;
-                    foreach (CdnPlatform eachPlatform in Enum.GetValues(typeof(CdnPlatform)))
-                    {
-                        var key = cdnPlatformSubfolder[eachPlatform] + bundleName;
-                        var path = cdnPath + key;
-                        await UploadAssetAsync(key, path,token);
-                    }
-                }
-            }
-            else
-            {
-                LogToFile("\tAn error occurred deserializing CDN Assets: ");
+                OutputPlayFabError("\tVC Upload Error: ", updateVcTask.Error);
                 return false;
             }
+
+            LogToFile("\tUploaded VC!");
             return true;
         }
         #endregion
@@ -769,7 +704,7 @@ namespace JerryUploader
             };
         }
 
-        private async Task<bool> UpdateCatalogAsync(List<CatalogItem> catalog,CancellationToken token)
+        private async Task<bool> UpdateCatalogAsync(List<CatalogItem> catalog, CancellationToken token)
         {
             if (IsCancellationRequest(token))
                 return false;
